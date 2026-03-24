@@ -18,9 +18,9 @@ DEFAULT_CHUNK_SIZE = 400
 DEFAULT_CHUNK_OVERLAP = 30
 DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
 DEFAULT_CHAT_MODEL = "gpt-4o-mini"
-DEFAULT_MAX_TOKENS = 200
+DEFAULT_MAX_TOKENS = 350
 CONTEXT_CHAR_CAP = 4000
-DEFAULT_K = 3
+DEFAULT_K = 8
 
 
 def load_documents(file_path: str) -> List[Document]:
@@ -98,8 +98,16 @@ def answer_question(
     docs = db.similarity_search(query, k=k)
     context = "\n".join(d.page_content for d in docs)
     context = context[:CONTEXT_CHAR_CAP]
-    prompt = f"""Answer based only on the context below. If the answer is not in the context, say you don't know from the document.
+    if not context.strip():
+        return (
+            "No readable text was retrieved from this file. "
+            "If this is a scanned PDF (image-only), extract text with OCR or export a text-based PDF."
+        )
+    prompt = f"""Use ONLY the excerpts below from the user's document. Synthesize a helpful answer.
+For broad questions (e.g. "what is this about"), summarize what the excerpts collectively suggest (topic, goals, main ideas).
+If the excerpts are too fragmented or unrelated to the question, say briefly what is missing.
 
+Excerpts:
 {context}
 
 Question:
@@ -119,6 +127,10 @@ def default_llm() -> ChatOpenAI:
         max_tokens=DEFAULT_MAX_TOKENS,
         temperature=0,
     )
+
+
+def total_text_length(documents: List[Document]) -> int:
+    return sum(len(d.page_content or "") for d in documents)
 
 
 def require_openai_key() -> None:

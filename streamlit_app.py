@@ -24,6 +24,7 @@ from rag_core import (
     default_llm,
     load_documents,
     require_openai_key,
+    total_text_length,
 )
 
 load_dotenv()
@@ -81,6 +82,11 @@ else:
             st.success(
                 f"Ready: **{uploaded.name}** ({len(docs)} loaded segment(s)). Ask below."
             )
+            if total_text_length(docs) < 200:
+                st.warning(
+                    "Very little text was extracted. Scanned (image) PDFs often produce no text—"
+                    "use a text-based PDF or OCR, then upload again."
+                )
         except Exception as e:
             st.session_state.db = None
             st.session_state.doc_fingerprint = None
