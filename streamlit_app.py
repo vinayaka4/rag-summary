@@ -9,6 +9,7 @@ Render: set OPENAI_API_KEY in Environment; use start command from render.yaml.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import tempfile
 from pathlib import Path
@@ -43,6 +44,8 @@ if "filename" not in st.session_state:
     st.session_state.filename = None
 if "messages" not in st.session_state:
     st.session_state.messages = []
+if "doc_fingerprint" not in st.session_state:
+    st.session_state.doc_fingerprint = None
 
 uploaded = st.file_uploader(
     "Upload document",
@@ -50,27 +53,43 @@ uploaded = st.file_uploader(
     help="Use .docx (not legacy .doc). Excel: .xlsx only.",
 )
 
-if uploaded is not None:
-    suffix = Path(uploaded.name).suffix.lower()
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp.write(uploaded.getbuffer())
-        tmp_path = tmp.name
-    try:
-        with st.spinner("Loading and indexing your document…"):
-            docs = load_documents(tmp_path)
-            embeddings = default_embeddings()
-            st.session_state.db = build_vectorstore(docs, embeddings)
-            st.session_state.filename = uploaded.name
-            st.session_state.messages = []
-        st.success(f"Ready: **{uploaded.name}** ({len(docs)} loaded segment(s)). Ask below.")
-    except Exception as e:
+# Fingerprint changes only when user picks a different file — avoids re-indexing every
+# chat turn (and avoids any stale session mixing with old indexes).
+if uploaded is None:
+    if st.session_state.doc_fingerprint is not None:
         st.session_state.db = None
-        st.error(f"Could not process file: {e}")
-    finally:
+        st.session_state.filename = None
+        st.session_state.messages = []
+        st.session_state.doc_fingerprint = None
+else:
+    file_bytes = uploaded.getbuffer()
+    digest = hashlib.md5(file_bytes).hexdigest()
+    fingerprint = f"{uploaded.name}:{uploaded.size}:{digest}"
+    if st.session_state.doc_fingerprint != fingerprint:
+        suffix = Path(uploaded.name).suffix.lower()
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(uploaded.getbuffer())
+            tmp_path = tmp.name
         try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
+            with st.spinner("Loading and indexing your document…"):
+                docs = load_documents(tmp_path)
+                embeddings = default_embeddings()
+                st.session_state.db = build_vectorstore(docs, embeddings)
+                st.session_state.filename = uploaded.name
+                st.session_state.messages = []
+                st.session_state.doc_fingerprint = fingerprint
+            st.success(
+                f"Ready: **{uploaded.name}** ({len(docs)} loaded segment(s)). Ask below."
+            )
+        except Exception as e:
+            st.session_state.db = None
+            st.session_state.doc_fingerprint = None
+            st.error(f"Could not process file: {e}")
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
 
 if st.session_state.db is None:
     st.info("Upload a document to begin.")

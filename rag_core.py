@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import uuid
 from pathlib import Path
 from typing import List
 
@@ -77,9 +78,15 @@ def make_text_splitter(
 
 
 def build_vectorstore(documents: List[Document], embeddings: OpenAIEmbeddings) -> Chroma:
+    """Fresh in-memory index. Unique collection name avoids mixing with prior indexes."""
     splitter = make_text_splitter()
     chunks = splitter.split_documents(documents)
-    return Chroma.from_documents(chunks, embeddings)
+    collection_name = f"rag_{uuid.uuid4().hex}"
+    return Chroma.from_documents(
+        chunks,
+        embeddings,
+        collection_name=collection_name,
+    )
 
 
 def answer_question(
