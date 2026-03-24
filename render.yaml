@@ -1,0 +1,11 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# After pushing to GitHub: Dashboard → New → Blueprint → connect repo, or paste this file.
+
+services:
+  - type: web
+    name: pdp-skimmer
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run streamlit_app.py --server.port=$PORT --server.address=0.0.0.0

@@ -1,0 +1,13 @@
+python-dotenv
+langchain
+langchain-community
+langchain-openai
+langchain-text-splitters
+chromadb
+pypdf
+openai
+tiktoken
+streamlit
+docx2txt
+pandas
+openpyxl
